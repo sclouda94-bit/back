@@ -1,5 +1,6 @@
 import "reflect-metadata";
-import { serve as honoServe, serveStatic } from "@hono/node-server";
+import { serve as honoServe } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { AppDataSource } from "./config/database";
@@ -41,7 +42,7 @@ AppDataSource.initialize()
         app.use("/*", serveStatic({ root: "./public" }));
 
         // SPA fallback: all unmatched routes return index.html (React Router support)
-        app.get("*", serveStatic({ path: "./public/index.html" }));
+        app.get("*", serveStatic({ path: "index.html", root: "./public" }));
 
         const port = parseInt(process.env.PORT || "3000");
         console.log(`Server is running on port ${port}`);
