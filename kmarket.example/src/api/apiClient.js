@@ -1,4 +1,6 @@
-export const API_URL = "http://localhost:3000/api";
+export const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:3000/api"
+    : "/api";
 
 export const fetchProducts = async () => {
     const res = await fetch(`${API_URL}/products`);
