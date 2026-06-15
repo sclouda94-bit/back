@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/index.ts",
     "build": "node -e \"const fs = require('fs'); const cp = require('child_process'); if (fs.existsSync('../kmarket.example')) { console.log('Building frontend...'); cp.execSync('npm install --prefix ../kmarket.example && npm run build --prefix ../kmarket.example', {stdio: 'inherit'}); fs.mkdirSync('./public', { recursive: true }); if (process.platform === 'win32') { cp.execSync('xcopy /E /I /Y ..\\\\kmarket.example\\\\dist .\\\\public', {stdio: 'inherit'}); } else { cp.execSync('cp -r ../kmarket.example/dist/* ./public/', {stdio: 'inherit'}); } } else { console.log('Frontend folder not found, skipping frontend build.'); }\"",
-    "start": "node -e \"const fs = require('fs'); if (!fs.existsSync('./public')) fs.mkdirSync('./public');\" && npm run build && tsx src/index.ts"
+    "start": "tsx src/index.ts"
   },
   "keywords": [],
   "author": "",

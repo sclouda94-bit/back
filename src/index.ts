@@ -15,16 +15,10 @@ dotenv.config();
 
 const app = new Hono();
 
-// Enable CORS for frontend
+// Enable CORS for all routes
 app.use("/*", cors());
 
-// Serve static files from the compiled frontend build
-app.use("/*", serveStatic({ root: "./public" }));
-
-// Fallback: serve index.html for the root and any unmatched routes (SPA support)
-app.get("/", serveStatic({ path: "./public/index.html" }));
-
-// Initialize DB and routes
+// Initialize DB and register API routes FIRST (before static file serving)
 AppDataSource.initialize()
     .then(() => {
         console.log("Data Source has been initialized!");
@@ -43,6 +37,12 @@ AppDataSource.initialize()
         app.route("/api/reports", reportController.router);
         app.route("/api/settings", settingController.router);
 
+        // Serve static assets (JS, CSS, images) from the compiled frontend
+        app.use("/*", serveStatic({ root: "./public" }));
+
+        // SPA fallback: all unmatched routes return index.html (React Router support)
+        app.get("*", serveStatic({ path: "./public/index.html" }));
+
         const port = parseInt(process.env.PORT || "3000");
         console.log(`Server is running on port ${port}`);
 
@@ -53,4 +53,5 @@ AppDataSource.initialize()
     })
     .catch((err) => {
         console.error("Error during Data Source initialization:", err);
+        process.exit(1);
     });
