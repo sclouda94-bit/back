@@ -1,6 +1,5 @@
 import "reflect-metadata";
-import { serve as honoServe } from "@hono/node-server";
-import { serveStatic } from "hono/node-server";
+import { serve as honoServe, serveStatic } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { AppDataSource } from "./config/database";
