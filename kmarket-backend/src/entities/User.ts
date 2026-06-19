@@ -14,14 +14,8 @@ export class User {
     @Column("varchar")
     password: string;
 
-    @Column("varchar", { default: "admin" })
-    role: string;
-
     @Column("varchar", { nullable: true })
     avatar: string;
-
-    @Column("int")
-    businessId: number;
 
     @CreateDateColumn()
     createdAt: Date;

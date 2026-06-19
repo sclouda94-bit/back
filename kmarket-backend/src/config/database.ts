@@ -9,6 +9,7 @@ import { Setting } from "../entities/Setting";
 import { Expense } from "../entities/Expense";
 import { Business } from "../entities/Business";
 import { User } from "../entities/User";
+import { UserBusiness } from "../entities/UserBusiness";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -25,7 +26,7 @@ export const AppDataSource = new DataSource(
               url: envDbUrl,
               synchronize: dbSync,
               logging: false,
-              entities: [Product, Client, Sale, SaleDetail, InventoryMovement, Setting, Expense, Business, User],
+              entities: [Product, Client, Sale, SaleDetail, InventoryMovement, Setting, Expense, Business, User, UserBusiness],
               subscribers: [],
               migrations: [],
               extra: {
@@ -41,7 +42,7 @@ export const AppDataSource = new DataSource(
               database: process.env.DB_NAME || "Kmarket",
               synchronize: dbSync,
               logging: false,
-              entities: [Product, Client, Sale, SaleDetail, InventoryMovement, Setting, Expense, Business, User],
+              entities: [Product, Client, Sale, SaleDetail, InventoryMovement, Setting, Expense, Business, User, UserBusiness],
               subscribers: [],
               migrations: [],
           }
