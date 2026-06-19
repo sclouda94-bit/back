@@ -1,4 +1,4 @@
-/* App.css — KMarket component styles (Office / Corporate) */
+/* App.css — Logistics Market component styles (Office / Corporate) */
 
 /* ── Sidebar ─────────────────────────────────────────────── */
 .sidebar {
@@ -44,8 +44,9 @@
 }
 
 .logo-text {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--text-primary);
   white-space: nowrap;
 }
@@ -149,6 +150,23 @@
   border-radius: 50%;
   background: var(--accent-primary);
   flex-shrink: 0;
+}
+
+.sidebar-logout-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  transition: var(--transition);
+  line-height: 1;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-logout-btn:hover {
+  color: var(--accent-rose);
 }
 
 .sidebar-user {
@@ -327,7 +345,7 @@
 /* ── Dashboard KPI Cards ─────────────────────────────────── */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -808,5 +826,27 @@
 
   .toolbar-filters {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clients-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-chip {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .data-table th, .data-table td {
+    padding: 8px 10px;
   }
 }

@@ -1,59 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { fetchDashboardStats, fetchClients } from '../api/apiClient';
+import React, { useState, useEffect, useCallback } from 'react';
+import { fetchDashboardStats, fetchClients, fetchTimeseries } from '../api/apiClient';
+import ChartPanel from '../components/ChartPanel';
+import { TrendingUp, ShoppingCart, PiggyBank, ChevronUp, ChevronDown, ChartBar } from 'lucide-react';
 
-// ── KPI Card ──────────────────────────────────────────────
-function KpiCard({ label, value, sub, trend, color }) {
+const METRIC_CONFIG = {
+  'Ingresos': { metric: 'revenue', color: '#22c55e', icon: TrendingUp, isMoney: true, gradient: 'linear-gradient(135deg, #22c55e18, #16a34a08)' },
+  'Ventas totales': { metric: 'sales', color: '#3b82f6', icon: ShoppingCart, isMoney: false, gradient: 'linear-gradient(135deg, #3b82f618, #2563eb08)' },
+  'Beneficio bruto': { metric: 'benefit', color: '#0891b2', icon: PiggyBank, isMoney: true, gradient: 'linear-gradient(135deg, #0891b218, #0e749008)' },
+};
+
+function KpiCard({ label, value, sub, trend, color, isActive, onClick }) {
+  const cfg = METRIC_CONFIG[label] || {};
+  const Icon = cfg.icon;
   const trendUp = trend >= 0;
   return (
-    <div className="kpi-card">
-      <div className="kpi-icon" style={{ background: color + '15', color }}>
-        <span style={{ fontSize: 16, fontWeight: 800 }}>
-          {label === 'Ingresos (semana)' ? '$' : label === 'Ventas hoy' ? '#' : label === 'Clientes activos' ? '◉' : '▢'}
-        </span>
+    <div
+      className={`kpi-card ${isActive ? 'active' : ''}`}
+      onClick={onClick}
+      style={{ '--kpi-color': color, '--kpi-gradient': cfg.gradient }}
+    >
+      <div className="kpi-icon" style={{ background: color + '18', color }}>
+        {Icon && <Icon size={20} />}
       </div>
       <div className="kpi-body">
         <div className="kpi-label">{label}</div>
         <div className="kpi-value">{value}</div>
         <div className="kpi-sub">
           <span className={`kpi-trend ${trendUp ? 'up' : 'down'}`}>
-            {trendUp ? '↑' : '↓'} {Math.abs(trend)}%
+            {trendUp ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {Math.abs(trend)}%
           </span>
           <span>{sub}</span>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Bar Chart (pure CSS) ──────────────────────────────────
-function WeeklyChart({ data }) {
-  if (!data || data.length === 0) {
-    return <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Sin datos esta semana</div>;
-  }
-  const max = Math.max(...data.map(d => d.sales), 1); // minimum 1 to avoid division by zero
-  return (
-    <div className="chart-container">
-      <div className="chart-bars">
-        {data.map((d, i) => (
-          <div key={i} className="chart-col">
-            <div className="chart-bar-wrap">
-              <div
-                className="chart-bar"
-                style={{ height: `${(d.sales / max) * 100}%` }}
-                title={`${d.day}: ${d.sales} ventas`}
-              >
-                <span className="chart-bar-tooltip">{d.sales}</span>
-              </div>
-            </div>
-            <div className="chart-label">{d.day}</div>
-          </div>
-        ))}
+      <div className="kpi-chart-hint">
+        {isActive ? '▲ ocultar' : <ChartBar size={14} />}
       </div>
     </div>
   );
 }
 
-// ── Recent Sales Table ────────────────────────────────────
 function RecentSales({ sales }) {
   const paymentLabel = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' };
   return (
@@ -73,7 +58,7 @@ function RecentSales({ sales }) {
             <tr key={s.id}>
               <td><span className="badge badge-indigo">{s.id}</span></td>
               <td>{s.clientName || 'Consumidor Final'}</td>
-              <td className="text-muted text-sm">{s.date || new Date(s.createdAt).toLocaleDateString()}</td>
+              <td className="text-muted text-sm">{new Date(s.saleDate || s.createdAt).toLocaleDateString()}</td>
               <td>{paymentLabel[s.paymentMethod] || '—'}</td>
               <td style={{ textAlign: 'right', fontWeight: 700, color: '#2d8a4e' }}>
                 ${parseFloat(s.totalAmount || s.total || 0).toFixed(2)}
@@ -86,9 +71,7 @@ function RecentSales({ sales }) {
   );
 }
 
-// ── Low Stock Alert ───────────────────────────────────────
 function LowStockAlert({ products }) {
-  // En backend ya filtramos low stock <= 5, pero si pasan todo, filtramos aquí tmb.
   const low = products.filter(p => p.stock <= 5);
   return (
     <div className="stock-list">
@@ -116,7 +99,6 @@ function LowStockAlert({ products }) {
   );
 }
 
-// ── Top Clients ───────────────────────────────────────────
 function TopClients({ clients }) {
   const top = [...clients].sort((a, b) => Number(b.totalSpent || 0) - Number(a.totalSpent || 0)).slice(0, 5);
   return (
@@ -138,11 +120,11 @@ function TopClients({ clients }) {
   );
 }
 
-// ── Main Dashboard Page ───────────────────────────────────
 export default function DashboardHome() {
   const [stats, setStats] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeCard, setActiveCard] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -163,18 +145,29 @@ export default function DashboardHome() {
     loadData();
   }, []);
 
+  const handleCardClick = useCallback((label) => {
+    setActiveCard(prev => prev === label ? null : label);
+  }, []);
+
   if (loading || !stats) {
-    return <div style={{ padding: 40, textAlign: 'center' }}>Cargando datos del dashboard...</div>;
+    return (
+      <div className="page-loading">
+        <div className="page-loading-spinner" />
+        <span>Cargando dashboard...</span>
+      </div>
+    );
   }
 
-  const activeClients = clients.filter(c => c.status !== 'inactive').length;
-  
-  // Use real weekly data from backend
-  const weeklyChartData = stats.weeklySales || [];
+  const kpiCards = [
+    { label: 'Ingresos', value: `$${parseFloat(stats.totalRevenue || 0).toFixed(2)}`, sub: 'total en el sistema', trend: 0 },
+    { label: 'Ventas totales', value: stats.totalSalesCount, sub: 'transacciones', trend: 0 },
+    { label: 'Beneficio bruto', value: `$${parseFloat(stats.totalProfit || 0).toFixed(2)}`, sub: 'costo vs venta de productos', trend: 0 },
+  ];
+
+  const activeConfig = activeCard ? METRIC_CONFIG[activeCard] : null;
 
   return (
-    <div>
-      {/* Page header */}
+    <div className="dashboard-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
@@ -182,53 +175,35 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="kpi-grid">
-        <KpiCard
-          label="Ingresos (histórico)"
-          value={`$${parseFloat(stats.totalRevenue || 0).toFixed(2)}`}
-          sub="total en el sistema"
-          trend={0}
-          color="#00fd3f93"
-        />
-        <KpiCard
-          label="Ventas totales"
-          value={stats.totalSalesCount}
-          sub="transacciones"
-          trend={0}
-          color="#225ab3ff"
-        />
-        <KpiCard
-          label="Clientes activos"
-          value={activeClients}
-          sub={`de ${stats.totalClients} totales`}
-          trend={0}
-          color="#0891b2"
-        />
-        <KpiCard
-          label="Stock bajo"
-          value={stats.lowStockProducts.length}
-          sub="artículos"
-          trend={0}
-          color="#d97706"
-        />
+        {kpiCards.map(card => {
+          const cfg = METRIC_CONFIG[card.label] || {};
+          return (
+            <KpiCard
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              sub={card.sub}
+              trend={card.trend}
+              color={cfg.color || '#6b7280'}
+              isActive={activeCard === card.label}
+              onClick={() => handleCardClick(card.label)}
+            />
+          );
+        })}
       </div>
 
-      {/* Charts row */}
-      <div className="dashboard-grid-2">
-        {/* Weekly chart */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Ventas por día</div>
-              <div className="card-subtitle">Semana actual</div>
-            </div>
-            <span className="badge badge-green">Esta semana</span>
-          </div>
-          <WeeklyChart data={weeklyChartData} />
-        </div>
+      {activeCard && activeConfig && (
+        <ChartPanel
+          key={activeCard}
+          label={activeCard}
+          color={activeConfig.color}
+          isMoney={activeConfig.isMoney}
+          fetchData={(period) => fetchTimeseries(activeConfig.metric, period)}
+        />
+      )}
 
-        {/* Top clients */}
+      <div className="dashboard-grid-2" style={{ gridTemplateColumns: '1fr' }}>
         <div className="card">
           <div className="card-header">
             <div>
@@ -241,9 +216,7 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* Bottom row */}
       <div className="dashboard-grid-3">
-        {/* Recent sales */}
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <div className="card-header">
             <div>
@@ -251,10 +224,9 @@ export default function DashboardHome() {
               <div className="card-subtitle">Transacciones recientes</div>
             </div>
           </div>
-          <RecentSales sales={stats.recentSales} />
+          <RecentSales sales={stats.recentSales || []} />
         </div>
 
-        {/* Low stock */}
         <div className="card">
           <div className="card-header">
             <div>
@@ -263,7 +235,7 @@ export default function DashboardHome() {
             </div>
             <span className="badge badge-rose">Alerta</span>
           </div>
-          <LowStockAlert products={stats.lowStockProducts} />
+          <LowStockAlert products={stats.lowStockProducts || []} />
         </div>
       </div>
     </div>

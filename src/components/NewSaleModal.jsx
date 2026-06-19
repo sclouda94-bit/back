@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { fetchClients, fetchProducts, createSale } from '../api/apiClient';
+import { useToast } from './Toast';
 
 export default function NewSaleModal({ onClose, onSave }) {
+  const toast = useToast();
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   
@@ -12,6 +14,44 @@ export default function NewSaleModal({ onClose, onSave }) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [saleDate, setSaleDate] = useState('');
+  const [dateText, setDateText] = useState('');
+  const [errors, setErrors] = useState({});
+
+  function formatDateInput(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+  }
+
+  function isValidDate(dd, mm, yyyy) {
+    if (mm < 1 || mm > 12) return false;
+    const daysInMonth = new Date(yyyy, mm, 0).getDate();
+    if (dd < 1 || dd > daysInMonth) return false;
+    return true;
+  }
+
+  function handleDateInput(e) {
+    const formatted = formatDateInput(e.target.value);
+    setDateText(formatted);
+    if (formatted.length === 10) {
+      const [d, m, y] = formatted.split('/').map(Number);
+      if (isValidDate(d, m, y)) {
+        const iso = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        setSaleDate(iso);
+      } else {
+        setSaleDate('');
+      }
+    } else {
+      setSaleDate('');
+    }
+  }
+
+  function handleClearDate() {
+    setDateText('');
+    setSaleDate('');
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -21,7 +61,7 @@ export default function NewSaleModal({ onClose, onSave }) {
         setProducts(pData);
       } catch (err) {
         console.error(err);
-        alert('Error al cargar datos para la venta');
+        toast('Error al cargar datos para la venta', 'error');
       } finally {
         setLoading(false);
       }
@@ -36,13 +76,20 @@ export default function NewSaleModal({ onClose, onSave }) {
     const prod = products.find(p => p.id === parseInt(selectedProduct));
     if (!prod) return;
 
-    if (quantity <= 0) return alert('La cantidad debe ser mayor a 0');
-    if (quantity > prod.stock) return alert(`Stock insuficiente. Solo hay ${prod.stock} disponibles.`);
+    if (quantity <= 0) {
+      setErrors(prev => ({ ...prev, quantity: 'La cantidad debe ser mayor a 0' }));
+      return;
+    }
+    if (quantity > prod.stock) {
+      setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${prod.stock} disponibles.` }));
+      return;
+    }
 
     const existing = items.find(i => i.productId === prod.id);
     if (existing) {
       if (existing.quantity + quantity > prod.stock) {
-        return alert(`Stock insuficiente. Solo hay ${prod.stock} disponibles en total.`);
+        setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${prod.stock} disponibles en total.` }));
+        return;
       }
       setItems(items.map(i => i.productId === prod.id ? {
         ...i,
@@ -70,7 +117,8 @@ export default function NewSaleModal({ onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (items.length === 0) {
-      return alert('Debe agregar al menos un producto a la venta.');
+      setErrors(prev => ({ ...prev, cart: 'Debe agregar al menos un producto a la venta.' }));
+      return;
     }
 
     try {
@@ -83,14 +131,15 @@ export default function NewSaleModal({ onClose, onSave }) {
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           subtotal: i.subtotal
-        }))
+        })),
+        saleDate: saleDate || null
       };
 
       await createSale(saleData);
-      onSave(); // Refreshes parent
+      onSave();
     } catch (err) {
       console.error(err);
-      alert('Error al procesar la venta');
+      toast('Error al procesar la venta', 'error');
     }
   }
 
@@ -124,7 +173,8 @@ export default function NewSaleModal({ onClose, onSave }) {
               </div>
               <div className="form-group" style={{ width: 80 }}>
                 <label className="form-label">Cant.</label>
-                <input className="form-input" type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} />
+                <input className="form-input" type="number" min="1" value={quantity} onChange={e => { setErrors({}); setQuantity(Math.max(1, parseInt(e.target.value) || 1)); }} />
+                {errors.quantity && <span style={{ color: 'var(--accent-rose)', fontSize: 11, marginTop: 2, display: 'block' }}>{errors.quantity}</span>}
               </div>
               <button type="button" className="btn btn-secondary" onClick={addItem} style={{ height: 42 }}>➕</button>
             </div>
@@ -156,6 +206,7 @@ export default function NewSaleModal({ onClose, onSave }) {
                   ))}
                 </tbody>
               </table>
+              {errors.cart && <span style={{ color: 'var(--accent-rose)', fontSize: 12, marginTop: 6, display: 'block' }}>{errors.cart}</span>}
             </div>
           </div>
 
@@ -180,6 +231,42 @@ export default function NewSaleModal({ onClose, onSave }) {
                 <option value="card">Tarjeta</option>
                 <option value="transfer">Transferencia</option>
               </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Fecha de Venta (Opcional)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="DD/MM/AAAA"
+                  value={dateText}
+                  onChange={handleDateInput}
+                  maxLength={10}
+                  style={{
+                    paddingRight: 36,
+                    borderColor: dateText.length === 10 && !saleDate ? '#ef4444' : undefined
+                  }}
+                />
+                <span style={{
+                  position: 'absolute', right: 10, top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 16, color: 'var(--text-muted)', pointerEvents: 'none'
+                }}>📅</span>
+                {dateText && (
+                  <span
+                    onClick={handleClearDate}
+                    style={{
+                      position: 'absolute', right: 32, top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer', fontSize: 12, color: 'var(--accent-rose)',
+                      lineHeight: 1, fontWeight: 600
+                    }}
+                  >
+                    ✕
+                  </span>
+                )}
+              </div>
             </div>
 
             <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '1px solid var(--border-color)' }}>
