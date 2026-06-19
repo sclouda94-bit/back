@@ -41,6 +41,16 @@ app.get("/api", (c) => {
 });
 
 // Initialize DB and register API routes
+console.log("DB Env:", JSON.stringify({
+    DATABASE_URL: process.env.DATABASE_URL ? "set" : "unset",
+    PGHOST: process.env.PGHOST || "unset",
+    PGPORT: process.env.PGPORT || "unset",
+    DB_HOST: process.env.DB_HOST || "unset",
+    DB_PORT: process.env.DB_PORT || "unset",
+    DB_SYNC: process.env.DB_SYNC || "unset",
+    NODE_ENV: process.env.NODE_ENV || "unset",
+}));
+
 AppDataSource.initialize()
     .then(async () => {
         console.log("Data Source has been initialized!");

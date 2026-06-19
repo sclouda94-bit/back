@@ -27,6 +27,7 @@ RUN npm ci
 # Copy backend source files
 COPY kmarket-backend/src/ ./src/
 COPY kmarket-backend/tsconfig.json ./
+COPY kmarket-backend/.env ./
 
 # Copy compiled frontend into public/ so the backend serves it
 COPY --from=frontend-builder /app/frontend/dist ./public
