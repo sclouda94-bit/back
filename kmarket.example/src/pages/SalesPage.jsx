@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchSales } from '../api/apiClient';
+import { fetchSales, fetchSale, deleteSale } from '../api/apiClient';
 import NewSaleModal from '../components/NewSaleModal';
+import { useToast } from '../components/Toast';
 import { SkeletonPage, SkeletonCards } from '../components/Skeleton';
 
 export default function SalesPage() {
+  const toast = useToast();
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [editSale, setEditSale] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
     loadSales();
@@ -24,6 +28,33 @@ export default function SalesPage() {
       setError(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleEdit(sale) {
+    try {
+      const data = await fetchSale(sale.id);
+      setEditSale(data);
+    } catch (err) {
+      console.error(err);
+      toast('Error al cargar los datos de la venta', 'error');
+    }
+  }
+
+  function handleDelete(sale) {
+    setDeleteTarget(sale);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteSale(deleteTarget.id);
+      setDeleteTarget(null);
+      loadSales();
+      toast('Venta eliminada correctamente', 'success');
+    } catch (err) {
+      console.error(err);
+      toast('Error al eliminar la venta', 'error');
     }
   }
 
@@ -102,6 +133,7 @@ export default function SalesPage() {
                 <th>Método de Pago</th>
                 <th>Estado</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -120,6 +152,12 @@ export default function SalesPage() {
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--accent-green)' }}>
                     ${parseFloat(sale.totalAmount).toLocaleString('es-DO', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                      <button className="btn-icon" onClick={() => handleEdit(sale)}>✏️</button>
+                      <button className="btn-icon" style={{ color: 'var(--accent-rose)' }} onClick={() => handleDelete(sale)}>🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -144,6 +182,35 @@ export default function SalesPage() {
             loadSales();
           }} 
         />
+      )}
+
+      {editSale && (
+        <NewSaleModal
+          sale={editSale}
+          onClose={() => setEditSale(null)}
+          onSave={() => {
+            setEditSale(null);
+            loadSales();
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDeleteTarget(null)}>
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h2 className="modal-title">🗑️ Eliminar Venta</h2>
+              <button className="btn-icon" onClick={() => setDeleteTarget(null)}>✕</button>
+            </div>
+            <p style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+              ¿Estás seguro de que deseas eliminar la venta <strong>#{deleteTarget.id}</strong> por <strong>${parseFloat(deleteTarget.totalAmount).toFixed(2)}</strong>? Esta acción restaurará el stock de los productos y no se puede deshacer.
+            </p>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancelar</button>
+              <button className="btn btn-danger" onClick={handleConfirmDelete}>🗑️ Eliminar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

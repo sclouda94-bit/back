@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { fetchClients, fetchProducts, createSale } from '../api/apiClient';
+import { fetchClients, fetchProducts, createSale, updateSale } from '../api/apiClient';
 import { useToast } from './Toast';
 
-export default function NewSaleModal({ onClose, onSave }) {
+export default function NewSaleModal({ sale, onClose, onSave }) {
   const toast = useToast();
+  const isEdit = !!sale;
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   
@@ -59,6 +60,34 @@ export default function NewSaleModal({ onClose, onSave }) {
         const [cData, pData] = await Promise.all([fetchClients(), fetchProducts()]);
         setClients(cData);
         setProducts(pData);
+
+        if (isEdit && sale) {
+          setSelectedClient(sale.sale.clientId ? String(sale.sale.clientId) : '');
+          setPaymentMethod(sale.sale.paymentMethod || 'cash');
+
+          if (sale.sale.saleDate) {
+            const d = new Date(sale.sale.saleDate);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            setDateText(`${dd}/${mm}/${yyyy}`);
+            setSaleDate(`${yyyy}-${mm}-${dd}`);
+          }
+
+          if (sale.details) {
+            const cart = sale.details.map(det => {
+              const prod = pData.find(p => p.id === det.productId);
+              return {
+                productId: det.productId,
+                name: prod ? prod.name : `Producto #${det.productId}`,
+                quantity: det.quantity,
+                unitPrice: parseFloat(det.unitPrice),
+                subtotal: parseFloat(det.subtotal)
+              };
+            });
+            setItems(cart);
+          }
+        }
       } catch (err) {
         console.error(err);
         toast('Error al cargar datos para la venta', 'error');
@@ -80,15 +109,17 @@ export default function NewSaleModal({ onClose, onSave }) {
       setErrors(prev => ({ ...prev, quantity: 'La cantidad debe ser mayor a 0' }));
       return;
     }
-    if (quantity > prod.stock) {
-      setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${prod.stock} disponibles.` }));
+    const currentQty = items.filter(i => i.productId === prod.id).reduce((a, i) => a + i.quantity, 0);
+    const availableStock = isEdit ? prod.stock + currentQty : prod.stock;
+    if (quantity > availableStock) {
+      setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${availableStock} disponibles.` }));
       return;
     }
 
     const existing = items.find(i => i.productId === prod.id);
     if (existing) {
-      if (existing.quantity + quantity > prod.stock) {
-        setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${prod.stock} disponibles en total.` }));
+      if (existing.quantity + quantity > availableStock) {
+        setErrors(prev => ({ ...prev, quantity: `Stock insuficiente. Solo hay ${availableStock} disponibles en total.` }));
         return;
       }
       setItems(items.map(i => i.productId === prod.id ? {
@@ -135,7 +166,11 @@ export default function NewSaleModal({ onClose, onSave }) {
         saleDate: saleDate || null
       };
 
-      await createSale(saleData);
+      if (isEdit) {
+        await updateSale(sale.sale.id, saleData);
+      } else {
+        await createSale(saleData);
+      }
       onSave();
     } catch (err) {
       console.error(err);
@@ -153,7 +188,7 @@ export default function NewSaleModal({ onClose, onSave }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 800 }}>
         <div className="modal-header">
-          <h2 className="modal-title">🧾 Nueva Venta</h2>
+          <h2 className="modal-title">{isEdit ? '✏️ Editar Venta' : '🧾 Nueva Venta'}</h2>
           <button type="button" className="btn-icon" onClick={onClose}>✕</button>
         </div>
         
@@ -275,7 +310,7 @@ export default function NewSaleModal({ onClose, onSave }) {
                 <span style={{ color: 'var(--accent-green)' }}>${totalAmount.toFixed(2)}</span>
               </div>
               <button type="button" className="btn btn-primary" style={{ width: '100%', padding: 12, fontSize: 16 }} onClick={handleSubmit}>
-                ✅ Procesar Venta
+                {isEdit ? '💾 Guardar Cambios' : '✅ Procesar Venta'}
               </button>
               <button type="button" className="btn btn-secondary" style={{ width: '100%', padding: 12, fontSize: 16, marginTop: 8 }} onClick={onClose}>
                 Cancelar

@@ -100,6 +100,31 @@ export const createSale = async (saleData) => {
     return res.json();
 };
 
+export const fetchSale = async (id) => {
+    const res = await fetch(`${API_URL}/sales/${id}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to fetch sale");
+    return res.json();
+};
+
+export const updateSale = async (id, saleData) => {
+    const res = await fetch(`${API_URL}/sales/${id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(saleData),
+    });
+    if (!res.ok) throw new Error("Failed to update sale");
+    return res.json();
+};
+
+export const deleteSale = async (id) => {
+    const res = await fetch(`${API_URL}/sales/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error("Failed to delete sale");
+    return res.json();
+};
+
 // --- Inventory API ---
 
 export const fetchInventoryMovements = async () => {
