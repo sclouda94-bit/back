@@ -21,13 +21,31 @@ export class ExpenseController {
             return c.json(expenses);
         });
 
+        // ── Categories endpoint ────────────────────────────────
+        this.router.get("/categories", async (c) => {
+            try {
+                const businessId = c.get("businessId");
+                const expenseRepo = AppDataSource.getRepository(Expense);
+                const expenses = await expenseRepo.find({ where: { businessId }, select: ["category"] });
+                const cats = [...new Set(expenses.map(e => e.category).filter(Boolean))];
+                return c.json(cats);
+            } catch (error) {
+                console.error("Error fetching expense categories:", error);
+                return c.json({ error: "Failed to fetch categories" }, 500);
+            }
+        });
+
         // ── Timeseries endpoint (must be before /:id) ──────────
         this.router.get("/timeseries", async (c) => {
             try {
                 const businessId = c.get("businessId");
                 const period = c.req.query("period") || "days";
+                const category = c.req.query("category") || "";
                 const expenseRepo = AppDataSource.getRepository(Expense);
-                const expenses = await expenseRepo.find({ where: { businessId }, order: { date: "ASC" } });
+                let expenses = await expenseRepo.find({ where: { businessId }, order: { date: "ASC" } });
+                if (category) {
+                    expenses = expenses.filter(e => e.category === category);
+                }
 
                 const expDateStr = (e: Expense): string => {
                     const d: any = e.date;

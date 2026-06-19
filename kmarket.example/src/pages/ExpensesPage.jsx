@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchExpenseTimeseries, fetchDashboardStats, fetchTimeseries } from '../api/apiClient';
+import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchExpenseTimeseries, fetchExpenseCategories, fetchDashboardStats, fetchTimeseries } from '../api/apiClient';
 import ChartPanel from '../components/ChartPanel';
 import { useToast } from '../components/Toast';
 import { Edit2, Plus, Save, Check, X, DollarSign } from 'lucide-react';
@@ -9,7 +9,7 @@ function ExpenseModal({ expense, onClose, onSave }) {
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState(
     expense || {
-      description: '', amount: 0, date: today, notes: ''
+      description: '', amount: 0, date: today, category: 'General', notes: ''
     }
   );
 
@@ -49,6 +49,10 @@ function ExpenseModal({ expense, onClose, onSave }) {
                 <label className="form-label">Fecha</label>
                 <input className="form-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Categoría</label>
+              <input className="form-input" value={form.category} onChange={e => set('category', e.target.value)} placeholder="Ej: Publicidad, Servicios, Oficina..." />
             </div>
             <div className="form-group">
               <label className="form-label">Notas (opcional)</label>
@@ -131,6 +135,8 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([]);
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [chartCategory, setChartCategory] = useState('');
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -169,10 +175,11 @@ export default function ExpensesPage() {
         const [filterYear, filterMonth] = monthFilter.split('-').map(Number);
         matchMonth = expenseMonth === filterMonth - 1 && expenseYear === filterYear;
       }
-      return matchSearch && matchMonth;
+      const matchCat = categoryFilter === 'all' || e.category === categoryFilter;
+      return matchSearch && matchMonth && matchCat;
     });
     return list;
-  }, [expenses, search, monthFilter]);
+  }, [expenses, search, monthFilter, categoryFilter]);
 
   const totalAmount = useMemo(() => {
     return filtered.reduce((acc, e) => acc + parseFloat(e.amount), 0);
@@ -189,6 +196,11 @@ export default function ExpensesPage() {
       options.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     });
     return Array.from(options).sort().reverse();
+  }, [expenses]);
+
+  const categories = useMemo(() => {
+    const cats = new Set(expenses.map(e => e.category).filter(Boolean));
+    return ['all', ...Array.from(cats)];
   }, [expenses]);
 
   function openDetail(e) { setSelected(e); setModal('detail'); }
@@ -268,12 +280,24 @@ export default function ExpensesPage() {
         </div>
       </div>
 
+      {(activeChart || activeMarginChart) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Categoría:</label>
+          <select className="form-select" value={chartCategory} onChange={e => setChartCategory(e.target.value)} style={{ maxWidth: 220 }}>
+            <option value="">Todas las categorías</option>
+            {categories.filter(c => c !== 'all').map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {activeChart && (
         <ChartPanel
           label="Total Gastado"
           color="#ef4444"
           isMoney
-          fetchData={(period) => fetchExpenseTimeseries(period)}
+          fetchData={(period) => fetchExpenseTimeseries(period, chartCategory)}
         />
       )}
 
@@ -284,7 +308,7 @@ export default function ExpensesPage() {
           isMoney={false}
           fetchData={async (period) => {
             const [expData, revData] = await Promise.all([
-              fetchExpenseTimeseries(period),
+              fetchExpenseTimeseries(period, chartCategory),
               fetchTimeseries('revenue', period)
             ]);
             return expData.map((pt, i) => ({
@@ -309,6 +333,11 @@ export default function ExpensesPage() {
               return <option key={m} value={m}>{months[parseInt(mo) - 1]} {y}</option>;
             })}
           </select>
+          <select className="form-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+            {categories.map(c => (
+              <option key={c} value={c}>{c === 'all' ? 'Todas las categorías' : c}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -328,16 +357,18 @@ export default function ExpensesPage() {
               <tr>
                 <th>Fecha</th>
                 <th>Descripción</th>
+                <th>Categoría</th>
                 <th>Monto</th>
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(e => (
-                <tr key={e.id} onClick={() => openDetail(e)} style={{ cursor: 'pointer' }}>
-                  <td className="text-muted">{new Date(e.date).toLocaleDateString('es-DO')}</td>
-                  <td style={{ fontWeight: 600 }}>{e.description}</td>
-                  <td style={{ fontWeight: 600, color: 'var(--accent-rose)' }}>${parseFloat(e.amount).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
+                  <tr key={e.id} onClick={() => openDetail(e)} style={{ cursor: 'pointer' }}>
+                    <td className="text-muted">{new Date(e.date).toLocaleDateString('es-DO')}</td>
+                    <td style={{ fontWeight: 600 }}>{e.description}</td>
+                    <td><span className="badge badge-indigo">{e.category || 'N/A'}</span></td>
+                    <td style={{ fontWeight: 600, color: 'var(--accent-rose)' }}>${parseFloat(e.amount).toLocaleString('es-DO', { minimumFractionDigits: 2 })}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }} onClick={e2 => e2.stopPropagation()}>
                       <button className="btn-icon" onClick={() => openEdit(e)}>✏️</button>

@@ -164,9 +164,17 @@ export const updateSettings = async (settings) => {
 
 // --- Expenses API ---
 
-export const fetchExpenseTimeseries = async (period = 'days') => {
-    const res = await fetch(`${API_URL}/expenses/timeseries?period=${encodeURIComponent(period)}`, { headers: getAuthHeaders() });
+export const fetchExpenseTimeseries = async (period = 'days', category = '') => {
+    let url = `${API_URL}/expenses/timeseries?period=${encodeURIComponent(period)}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error("Failed to fetch expense timeseries");
+    return res.json();
+};
+
+export const fetchExpenseCategories = async () => {
+    const res = await fetch(`${API_URL}/expenses/categories`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error("Failed to fetch expense categories");
     return res.json();
 };
 

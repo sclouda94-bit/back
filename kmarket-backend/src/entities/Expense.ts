@@ -17,6 +17,9 @@ export class Expense {
     @Column("int")
     businessId: number;
 
+    @Column("varchar", { nullable: true })
+    category: string;
+
     @Column("text", { nullable: true })
     notes: string;
 
